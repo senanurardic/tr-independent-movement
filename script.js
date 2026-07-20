@@ -184,10 +184,12 @@ function animateNodes(timestamp) {
     if (elapsed < (PRE_SEQUENCE_DURATION + DELAY_DURATION + MOVE_DURATION)) {
         requestAnimationFrame(animateNodes);
     } else {
-        // Tüm süreç bittiğinde Qualtrics paneline sinyal gönderilir
+        // GÜNCELLEME: Kuzeye yürüyüş de dahil olmak üzere her şey bittiğinde Qualtrics'e haber uçurur
         setTimeout(() => {
-            (window.parent || window).postMessage("mapAnimationFinished", "*");
-        }, 1000); // Son konumu 1 saniye ekranda tutma payı
+            if (window.parent) {
+                window.parent.postMessage("mapAnimationFinished", "*");
+            }
+        }, 1000); // Katılımcının son kareyi 1 saniye görmesi için bekleme payı
     }
 }
 
