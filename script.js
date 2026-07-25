@@ -81,8 +81,11 @@ const deltaLat = startM[1] - startG[1];
 const targetG = [midLng - (deltaLng * offsetPercent), midLat - (deltaLat * offsetPercent)];
 const targetM = [midLng + (deltaLng * offsetPercent), midLat + (deltaLat * offsetPercent)];
 
-// Kuzeye doğru hareket hızı / adımı sabiti
-const northMoveStep = 0.0035; 
+// Orbiting parametreleri
+const EARTH_RADIUS_METERS = 6378137;
+const LAT_TO_METERS = (Math.PI * EARTH_RADIUS_METERS) / 180; 
+const radiusMeters = 50.0; 
+const orbitSpeed = 0.004;
 
 const stepLng = 0.0025; const stepLat = 0.0018;
 
@@ -152,15 +155,21 @@ function animateNodes(timestamp) {
                 currentM_Lng = startM[0] + (targetM[0] - startM[0]) * progress;
                 currentM_Lat = startM[1] + (targetM[1] - startM[1]) * progress;
             } else {
-                // Son 5 saniyede kuzeye doğru birlikte hareket ederler
-                const northElapsed = moveElapsed - 10000; 
-                const progressNorth = Math.min(northElapsed / 5000, 1);
+                // Son bölümde dairesel yörünge hareketi (Orbiting) yaparlar
+                const orbitElapsedSeconds = (moveElapsed - 10000) / 1000;
+                const currentAngle = orbitElapsedSeconds * 60 * orbitSpeed;
 
-                currentG_Lng = targetG[0];
-                currentG_Lat = targetG[1] + (northMoveStep * progressNorth);
+                const lngToMetersG = LAT_TO_METERS * Math.cos(targetG[1] * Math.PI / 180);
+                const deltaLatG = (radiusMeters * Math.sin(currentAngle)) / LAT_TO_METERS;
+                const deltaLngG = (radiusMeters * (Math.cos(currentAngle) - 1)) / lngToMetersG;
+                currentG_Lng = targetG[0] + deltaLngG;
+                currentG_Lat = targetG[1] + deltaLatG;
 
-                currentM_Lng = targetM[0];
-                currentM_Lat = targetM[1] + (northMoveStep * progressNorth);
+                const lngToMetersM = LAT_TO_METERS * Math.cos(targetM[1] * Math.PI / 180);
+                const deltaLatM = (radiusMeters * Math.sin(currentAngle)) / LAT_TO_METERS;
+                const deltaLngM = (radiusMeters * (Math.cos(currentAngle) - 1)) / lngToMetersM;
+                currentM_Lng = targetM[0] + deltaLngM;
+                currentM_Lat = targetM[1] + deltaLatM;
             }
         }
     }
@@ -172,12 +181,11 @@ function animateNodes(timestamp) {
     if (elapsed < (PRE_SEQUENCE_DURATION + DELAY_DURATION + MOVE_DURATION)) {
         requestAnimationFrame(animateNodes);
     } else {
-        // GÜNCELLEME: Kuzeye yürüyüş de dahil olmak üzere her şey bittiğinde Qualtrics'e haber uçurur
         setTimeout(() => {
             if (window.parent) {
                 window.parent.postMessage("mapAnimationFinished", "*");
             }
-        }, 1000); // Katılımcının son kareyi 1 saniye görmesi için bekleme payı
+        }, 1000);
     }
 }
 
