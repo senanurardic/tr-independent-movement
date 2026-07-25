@@ -1,6 +1,7 @@
 let animationStarted = false;
 let userNickname = "";
 let map = null;
+const markerInstances = {};
 
 // ============================
 // ANKARA KML GEOMETRY VERTICES
@@ -48,8 +49,6 @@ function createMarkerElement(person) {
     return clusterEl;
 }
 
-const markerInstances = {};
-
 function initMarkers() {
     if (!map) return;
     people.forEach(person => {
@@ -63,15 +62,16 @@ function initMarkers() {
 // ============================
 // TIMED LINEAR INTERPOLATION ENGINE
 // ============================
-const PRE_SEQUENCE_DURATION = 30 * 1000; 
-const DELAY_DURATION = 5 * 1000;         
-const MOVE_DURATION = 15 * 1000; // Toplam hareket süresi 15 saniye       
+const PRE_SEQUENCE_DURATION = 12 * 1000; // Standardized 12-second neutral baseline phase
+const DELAY_DURATION = 5 * 1000;         // 5-second delay before condition-specific movement
+const MOVE_DURATION = 15 * 1000;         // 15-second movement phase (10s approach + 5s orbit)
 let startTime = null;
 
 const startG = positions.leftNode;
 const startM = positions.rightNode;
 const startMain = positions.mainNode;
 
+// Condition 3 Specific Target Calculations: Meeting approach followed by orbiting behavior
 const midLng = (startG[0] + startM[0]) / 2;
 const midLat = (startG[1] + startM[1]) / 2; 
 const offsetPercent = 0.04; 
@@ -81,30 +81,25 @@ const deltaLat = startM[1] - startG[1];
 const targetG = [midLng - (deltaLng * offsetPercent), midLat - (deltaLat * offsetPercent)];
 const targetM = [midLng + (deltaLng * offsetPercent), midLat + (deltaLat * offsetPercent)];
 
-// Orbiting parametreleri
+// Orbiting parameters for Condition 3
 const EARTH_RADIUS_METERS = 6378137;
 const LAT_TO_METERS = (Math.PI * EARTH_RADIUS_METERS) / 180; 
 const radiusMeters = 50.0; 
 const orbitSpeed = 0.004;
 
-const stepLng = 0.0025; const stepLat = 0.0018;
+// Standardized neutral baseline parameters
+const BASELINE_DRIFT_RADIUS = 0.0005;
 
-// Vectors
-const gToMLng = startM[0] - startG[0]; const gToMLat = startM[1] - startG[1];
-const gDistToM = Math.sqrt(gToMLng * gToMLng + gToMLat * gToMLat);
-const gStepToMLng = (gToMLng / gDistToM) * stepLng * 1.5; const gStepToMLat = (gToMLat / gDistToM) * stepLat * 1.5;
+// Calculate exact coordinates at t = 12s to ensure seamless transitions without spatial snapping
+const finalDriftG_X = Math.sin(PRE_SEQUENCE_DURATION / 1800) * BASELINE_DRIFT_RADIUS;
+const finalDriftG_Y = Math.cos(PRE_SEQUENCE_DURATION / 2700) * (BASELINE_DRIFT_RADIUS * 0.8);
+const finalDriftM_X = Math.cos(PRE_SEQUENCE_DURATION / 2200) * BASELINE_DRIFT_RADIUS;
+const finalDriftM_Y = Math.sin(PRE_SEQUENCE_DURATION / 3100) * (BASELINE_DRIFT_RADIUS * 0.8);
 
-const gToMainLng = startMain[0] - startG[0]; const gToMainLat = startMain[1] - startG[1];
-const gDistToMain = Math.sqrt(gToMainLng * gToMainLng + gToMainLat * gToMainLat);
-const gStepToMainLng = (gToMainLng / gDistToMain) * stepLng * 1.5; const gStepToMainLat = (gToMainLat / gDistToMain) * stepLat * 1.5;
-
-const mToGLng = startG[0] - startM[0]; const mToGLat = startG[1] - startM[1];
-const mDistToG = Math.sqrt(mToGLng * mToGLng + mToGLat * mToGLat);
-const mStepToGLng = (mToGLng / mDistToG) * stepLng * 1.5; const mStepToGLat = (mToGLat / mDistToG) * stepLat * 1.5;
-
-const mToMainLng = startMain[0] - startM[0]; const mToMainLat = startMain[1] - startM[1];
-const mDistToMain = Math.sqrt(mToMainLng * mToMainLng + mToMainLat * mToMainLat);
-const mStepToMainLng = (mToMainLng / mDistToMain) * stepLng * 1.5; const mStepToMainLat = (mToMainLat / mDistToMain) * stepLat * 1.5;
+const holdG_Lng = startG[0] + finalDriftG_X;
+const holdG_Lat = startG[1] + finalDriftG_Y;
+const holdM_Lng = startM[0] + finalDriftM_X;
+const holdM_Lat = startM[1] + finalDriftM_Y;
 
 function animateNodes(timestamp) {
     if (!animationStarted) return;
@@ -114,48 +109,43 @@ function animateNodes(timestamp) {
     let currentM_Lng = startM[0]; let currentM_Lat = startM[1];
 
     if (elapsed < PRE_SEQUENCE_DURATION) {
-        // Koreografi Aşamaları
-        if (elapsed < 3000) { currentG_Lng = startG[0]; currentG_Lat = startG[1]; } 
-        else if (elapsed < 7000) { const p = (elapsed - 3000) / 4000; currentG_Lng = startG[0] + (gStepToMainLng * p); currentG_Lat = startG[1] + (gStepToMainLat * p); } 
-        else if (elapsed < 8000) { currentG_Lng = startG[0] + gStepToMainLng; currentG_Lat = startG[1] + gStepToMainLat; }
-        else if (elapsed < 12000) { const p = (elapsed - 8000) / 4000; currentG_Lng = (startG[0] + gStepToMainLng) - (gStepToMainLng * p); currentG_Lat = (startG[1] + gStepToMainLat) - (gStepToMainLat * p); }
-        else if (elapsed < 14000) { currentG_Lng = startG[0]; currentG_Lat = startG[1]; }
-        else if (elapsed < 18000) { const p = (elapsed - 14000) / 4000; currentG_Lng = startG[0] + (gStepToMLng * p); currentG_Lat = startG[1] + (gStepToMLat * p); }
-        else if (elapsed < 22000) { const p = (elapsed - 18000) / 4000; currentG_Lng = (startG[0] + gStepToMLng) - (gStepToMLng * p); currentG_Lat = (startG[1] + gStepToMLat) - (gStepToMLat * p); }
-        else if (elapsed < 26000) { const p = (elapsed - 22000) / 4000; currentG_Lng = startG[0] - (stepLng * p); currentG_Lat = startG[1]; }
-        else { const p = (elapsed - 26000) / 4000; currentG_Lng = (startG[0] - stepLng) + (stepLng * p); currentG_Lat = startG[1]; }
+        // =========================================================================
+        // STANDARDIZED NEUTRAL BASELINE PHASE (0 - 12 Seconds)
+        // =========================================================================
+        const driftG_X = Math.sin(elapsed / 1800) * BASELINE_DRIFT_RADIUS;
+        const driftG_Y = Math.cos(elapsed / 2700) * (BASELINE_DRIFT_RADIUS * 0.8);
+        const driftM_X = Math.cos(elapsed / 2200) * BASELINE_DRIFT_RADIUS;
+        const driftM_Y = Math.sin(elapsed / 3100) * (BASELINE_DRIFT_RADIUS * 0.8);
 
-        if (elapsed < 3000) { currentM_Lng = startM[0]; currentM_Lat = startM[1]; }
-        else if (elapsed < 6000) { const p = (elapsed - 3000) / 3000; currentM_Lng = startM[0]; currentM_Lat = startM[1] + (stepLat * p); }
-        else if (elapsed < 8000) { currentM_Lng = startM[0]; currentM_Lat = startM[1] + stepLat; }
-        else if (elapsed < 11000) { const p = (elapsed - 8000) / 3000; currentM_Lng = startM[0]; currentM_Lat = (startM[1] + stepLat) - (stepLat * p); }
-        else if (elapsed < 13000) { currentM_Lng = startM[0]; currentM_Lat = startM[1]; }
-        else if (elapsed < 17000) { const p = (elapsed - 13000) / 4000; currentM_Lng = startM[0] + (mStepToGLng * p); currentM_Lat = startM[1] + (mStepToGLat * p); }
-        else if (elapsed < 21000) { const p = (elapsed - 17000) / 4000; currentM_Lng = (startM[0] + mStepToGLng) - (mStepToGLng * p); currentM_Lat = (startM[1] + mStepToGLat) - (mStepToGLat * p); }
-        else if (elapsed < 25000) { const p = (elapsed - 21000) / 4000; currentM_Lng = startM[0] + (mStepToMainLng * p); currentM_Lat = startM[1] + (mStepToMainLat * p); }
-        else if (elapsed < 26000) { currentM_Lng = startM[0] + mStepToMainLng; currentM_Lat = startM[1] + mStepToMainLat; }
-        else { const p = (elapsed - 26000) / 4000; currentM_Lng = (startM[0] + mStepToMainLng) - (mStepToMainLng * p); currentM_Lat = (startM[1] + mStepToMainLat) - (mStepToMainLat * p); }
+        currentG_Lng = startG[0] + driftG_X;
+        currentG_Lat = startG[1] + driftG_Y;
+        currentM_Lng = startM[0] + driftM_X;
+        currentM_Lat = startM[1] + driftM_Y;
 
     } else {
-        // ANA HAREKET SEKANSI
+        // =========================================================================
+        // CONDITION 3 SPECIFIC MANIPULATION PHASE (12s+ onwards)
+        // =========================================================================
         const mainElapsed = elapsed - PRE_SEQUENCE_DURATION;
 
         if (mainElapsed < DELAY_DURATION) {
-            currentG_Lng = startG[0]; currentG_Lat = startG[1];
-            currentM_Lng = startM[0]; currentM_Lat = startM[1];
+            // Hold at the exact final baseline position during the 5-second delay
+            currentG_Lng = holdG_Lng;
+            currentG_Lat = holdG_Lat;
+            currentM_Lng = holdM_Lng;
+            currentM_Lat = holdM_Lat;
         } else {
-            const moveElapsed = mainElapsed - DELAY_DURATION; 
+            const moveElapsed = mainElapsed - DELAY_DURATION;
 
             if (moveElapsed <= 10000) {
-                // İlk 10 saniyede buluşma noktalarına ulaşırlar
+                // First 10 seconds: Interpolate smoothly from held baseline positions to targets
                 const progress = moveElapsed / 10000;
-                currentG_Lng = startG[0] + (targetG[0] - startG[0]) * progress;
-                currentG_Lat = startG[1] + (targetG[1] - startG[1]) * progress;
-
-                currentM_Lng = startM[0] + (targetM[0] - startM[0]) * progress;
-                currentM_Lat = startM[1] + (targetM[1] - startM[1]) * progress;
+                currentG_Lng = holdG_Lng + (targetG[0] - holdG_Lng) * progress;
+                currentG_Lat = holdG_Lat + (targetG[1] - holdG_Lat) * progress;
+                currentM_Lng = holdM_Lng + (targetM[0] - holdM_Lng) * progress;
+                currentM_Lat = holdM_Lat + (targetM[1] - holdM_Lat) * progress;
             } else {
-                // Son bölümde dairesel yörünge hareketi (Orbiting) yaparlar
+                // Final 5 seconds: Execute circular orbital trajectory around target coordinates
                 const orbitElapsedSeconds = (moveElapsed - 10000) / 1000;
                 const currentAngle = orbitElapsedSeconds * 60 * orbitSpeed;
 
@@ -177,7 +167,6 @@ function animateNodes(timestamp) {
     if (markerInstances["leftNode"]) markerInstances["leftNode"].setLngLat([currentG_Lng, currentG_Lat]);
     if (markerInstances["rightNode"]) markerInstances["rightNode"].setLngLat([currentM_Lng, currentM_Lat]);
 
-    // ANIMASYON KONTROLÜ VE QUALTRICS YÖNLENDİRME SİNYALİ
     if (elapsed < (PRE_SEQUENCE_DURATION + DELAY_DURATION + MOVE_DURATION)) {
         requestAnimationFrame(animateNodes);
     } else {
@@ -190,7 +179,7 @@ function animateNodes(timestamp) {
 }
 
 // ============================
-// SIRALI DENEY AKIŞ MOTORU
+// EXPERIMENT FLOW ENGINE
 // ============================
 const flowScreen = document.getElementById("experiment-flow-screen");
 const stepConnecting = document.getElementById("step-connecting");
@@ -236,10 +225,11 @@ if (nicknameInput) {
     nicknameInput.addEventListener("keypress", (e) => { if (e.key === "Enter") handleLoginSubmit(); });
 }
 
-// 1. KİLİTLENMEYİ ENGELLEYEN ADIM: Deney akışı haritayı beklemeden anında başlar
+// ============================
+// FAIL-SAFE INITIALIZATION BLOCK
+// ============================
 startExperimentFlow();
 
-// 2. KİLİTLENMEYİ ENGELLEYEN ADIM: Harita güvenli alanda yüklenir (Hata verse bile sayfa çökmez)
 try {
     if (typeof maplibregl !== 'undefined') {
         map = new maplibregl.Map({
@@ -258,5 +248,5 @@ try {
         });
     }
 } catch (e) {
-    console.error("Harita kütüphanesi yükleme engeli:", e);
+    console.error("Map library loading error:", e);
 }
