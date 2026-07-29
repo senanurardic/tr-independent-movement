@@ -64,8 +64,8 @@ function initMarkers() {
 // ============================
 const PRE_SEQUENCE_DURATION     = 12 * 1000; // 0 - 12s: Standardized neutral baseline phase
 const PAUSE_DURATION            = 4 * 1000;  // 12 - 16s: Pause phase
-const ORBIT_DURATION            = 11 * 1000; // 16 - 27s: Agents orbit around themselves independently (Total = 27s)
-const NON_COORDINATED_DURATION  = 13 * 1000; // 27 - 40s: Non-coordinated and non-synchronized independent micro-movements (Total = 40s)
+const ORBIT_DURATION            = 12 * 1000; // 16 - 28s: Agents orbit around themselves independently (Total = 28s)
+const NON_COORDINATED_DURATION  = 12 * 1000; // 28 - 40s: Non-coordinated and non-synchronized independent micro-movements (Total = 40s)
 const TOTAL_ANIMATION_DURATION  = PRE_SEQUENCE_DURATION + PAUSE_DURATION + ORBIT_DURATION + NON_COORDINATED_DURATION; // 40s Total
 
 let startTime = null;
@@ -129,7 +129,7 @@ function animateNodes(timestamp) {
 
     } else if (elapsed < (PRE_SEQUENCE_DURATION + PAUSE_DURATION + ORBIT_DURATION)) {
         // =========================================================================
-        // PHASE 3: INDEPENDENT SELF-ORBITING PHASE (16s - 27s)
+        // PHASE 3: INDEPENDENT SELF-ORBITING PHASE (16s - 28s)
         // =========================================================================
         const orbitElapsedSeconds = (elapsed - (PRE_SEQUENCE_DURATION + PAUSE_DURATION)) / 1000;
         const currentAngle = orbitElapsedSeconds * 60 * orbitSpeed;
@@ -148,7 +148,7 @@ function animateNodes(timestamp) {
 
     } else {
         // =========================================================================
-        // PHASE 4: NON-COORDINATED & NON-SYNCHRONIZED POST-ORBIT MOVEMENTS (27s - 40s)
+        // PHASE 4: NON-COORDINATED & NON-SYNCHRONIZED POST-ORBIT MOVEMENTS (28s - 40s)
         // =========================================================================
         const nonCoordElapsed = elapsed - (PRE_SEQUENCE_DURATION + PAUSE_DURATION + ORBIT_DURATION);
         
