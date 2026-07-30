@@ -416,9 +416,9 @@ try {
             container: 'map',
             style: 'https://tiles.openfreemap.org/styles/liberty',
             center: [32.8540, 39.9195], 
-            zoom: 13.6,                
-            minZoom: 13.6,             
-            maxZoom: 13.6,             
+            zoom: 13.0,                
+            minZoom: 13.0,             
+            maxZoom: 13.0,             
             dragPan: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoomRotate: false,    
             pixelRatio: window.devicePixelRatio || 2 
         });
