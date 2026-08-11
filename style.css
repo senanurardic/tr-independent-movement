@@ -51,9 +51,9 @@ body {
 
 /* Everyone Joined özel paragraf girintisi */
 .flow-step p.paragraph-indent {
-    margin-top: 15px;      
-    text-indent: 40px;     
-    max-width: 600px;      
+    margin-top: 15px;
+    text-indent: 40px;
+    max-width: 600px;
 }
 
 .spinner {
@@ -154,35 +154,55 @@ body {
     flex: 1;
     width: 100%;
     height: 100%;
-    background-color: #cff0a3; 
+    background-color: #cff0a3;
+}
+
+/* ===== MARKER GEOMETRY =====
+   Recalibrated for zoom 16
+    (0.458 m/pixel). At the meeting point the two agent
+   dots are 18 m apart, i.e. 39 px centre-to-centre: 32 px dots leave a visible
+   7 px gap, so the joined agents read as two people standing together rather
+   than merging into a single blob. At the previous 40 px they would overlap. */
+
+.marker-cluster {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.agent-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .agent-label {
-    margin-top: 8px;
+    margin-top: 6px;
     background-color: rgba(17, 24, 39, 0.85);
     color: #ffffff;
-    padding: 4px 10px;
+    padding: 3px 9px;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: bold;
+    white-space: nowrap;
     z-index: 3;
 }
 
 .experimental-grey-letter-dot {
-    width: 40px; height: 40px; background-color: #91a3ce; border: 2px solid #ffffff; border-radius: 50%;
-    display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: #ffffff; 
+    width: 32px; height: 32px; background-color: #91a3ce; border: 2px solid #ffffff; border-radius: 50%;
+    display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; color: #ffffff;
 }
 
 .google-maps-dot-container {
-    position: relative; width: 66px; height: 36px; display: flex; justify-content: center; align-items: center;
+    position: relative; width: 56px; height: 32px; display: flex; justify-content: center; align-items: center;
 }
 
 .google-maps-core {
-    width: 23px; height: 23px; background-color: #1a73e8; border: 2px solid #ffffff; border-radius: 50%; position: absolute; z-index: 2;
+    width: 20px; height: 20px; background-color: #1a73e8; border: 2px solid #ffffff; border-radius: 50%; position: absolute; z-index: 2;
 }
 
 .google-maps-pulse {
-    width: 58px; height: 58px; background-color: rgba(26, 115, 232, 0.25); border-radius: 50%; position: absolute; z-index: 1; animation: googleMapsBreath 2.2s ease-in-out infinite;
+    width: 50px; height: 50px; background-color: rgba(26, 115, 232, 0.25); border-radius: 50%; position: absolute; z-index: 1; animation: googleMapsBreath 2.2s ease-in-out infinite;
 }
 
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
