@@ -358,7 +358,13 @@ let animationStartWallClock = null;
 function buildPayload(reason) {
     return {
         type: "MAP_ANIMATION_COMPLETE",
+        // Clearly-labelled condition identifier for the Qualtrics-side
+        // listener to write into Embedded Data. `condition` is the short
+        // code ("IM" | "SJ" | "SJC") that should be stored as the variable
+        // value; `conditionLabel` is included alongside it purely so the
+        // saved data is human-readable/auditable without a codebook lookup.
         condition: CONDITION,                     // "IM" | "SJ" | "SJC"
+        conditionLabel: CONDITION_LABEL,
         sessionId: SESSION_ID,
         status: (reason === "normal") ? "complete" : "incomplete",
         reason: reason,                           // normal | timeout | map-load-failed | manual-fallback
