@@ -27,7 +27,7 @@
  *   - Each agent walks for exactly 10 s of the 12 s in Block 1 (15.0 m) and
  *     10 s of the 12 s in Block 3 (15.0 m): 30.0 m total per agent, matched
  *     across conditions.
- *   - G-M start separation: 49.0 m, identical in every condition.
+ *   - G-M start separation: 40.0 m, identical in every condition.
  *   - Icons never overlap and never leave the zoom-18 viewport.
  *   - Only the MANIPULATION differs between files: here, the agents never
  *     move toward one another. Bearings for G and M are chosen so they are
@@ -42,36 +42,62 @@
 const CONDITION = "IM";
 const CONDITION_LABEL = "Independent Movement";
 
+// Each block is a closed rectangular loop for each agent: two pairs of
+// equal-duration, opposite-bearing legs that sum to exactly zero net
+// displacement, so the agent wanders locally and returns to EXACTLY its own
+// starting point by the end of the block. By the end of Block 3, both G and
+// M are back at their original START_G / START_M coordinates -- there is
+// never a sustained drift toward the other agent (an affiliation cue) or
+// away from the other agent (a separation cue).
+//
+// On top of the closed-loop property, each rectangle is oriented mostly
+// ALONG the G-M axis's perpendicular (tangential) direction rather than
+// along it (radial direction), and the leg that does carry a radial
+// component is kept short. This keeps the on-screen G-M gap close to the
+// 49 m starting separation throughout, not just at the start/end of each
+// block: with the previous (non-tangential) loop orientation the gap still
+// dipped to ~38.8 m mid-block even though it returned to 49 m at the end.
+// G and M use different rectangle dimensions, different orientations, and
+// different pause placements so neither the shape nor the timing of one
+// agent mirrors the other; durations, pause counts, and total walking
+// distance (15 m per block, 30 m total per agent) are unchanged.
+
 // -- Block 1 (local t = 0-12 s within the block) --------------------------
-// G: east, pause, north, east, pause, south -- a simple street-grid loop.
-// G's pauses fall at local t = 2-3 s and 8-9 s.
+// G: short leg (1s, radial) + long leg (4s, tangential), oriented on the
+// G-M axis itself (255/75 deg radial, 345/165 deg tangential).
+// G's pauses fall at local t = 1-2 s and 7-8 s.
 const SCHEDULE_G_BLOCK1 = [
-    { d: 2, b: 92 }, { d: 1, b: null }, { d: 3, b: 4 },
-    { d: 2, b: 92 }, { d: 1, b: null }, { d: 3, b: 182 }
+    { d: 1, b: 255 }, { d: 1, b: null }, { d: 4, b: 345 },
+    { d: 1, b: 75 }, { d: 1, b: null }, { d: 4, b: 165 }
 ];
-// M: southwest, pause, north, pause, east -- deliberately not the mirror
-// image of G's path, and never on an opposite bearing at the same second.
-// M's pauses fall at local t = 4-5 s and 7-8 s.
+// M: same short/long split as G but leg order and starting orientation
+// reversed (tangential leg first), so the path and its timing don't mirror
+// G's.
+// M's pauses fall at local t = 4-5 s and 10-11 s.
 const SCHEDULE_M_BLOCK1 = [
-    { d: 4, b: 205 }, { d: 1, b: null }, { d: 2, b: 4 },
-    { d: 1, b: null }, { d: 4, b: 92 }
+    { d: 4, b: 165 }, { d: 1, b: null }, { d: 1, b: 75 },
+    { d: 4, b: 345 }, { d: 1, b: null }, { d: 1, b: 255 }
 ];
 
 // -- Block 2 (both agents fully stationary for 2 s) ------------------------
 const SCHEDULE_BLOCK2_PAUSE = [{ d: 2, b: null }];
 
 // -- Block 3 (local t = 0-12 s within the block) ---------------------------
-// Same movement logic as Block 1 (independent walking + two 1 s pauses per
-// agent, non-mirrored) but every bearing is different from Block 1's.
-// G's pauses fall at local t = 3-4 s and 9-10 s.
+// Same closed-loop logic as Block 1 (independent walking + two 1 s pauses
+// per agent, non-mirrored, tangential-biased, returns to start) but every
+// bearing is rotated away from Block 1's so the directions are different.
+// G: rectangle rotated +30 deg from Block 1's orientation.
+// G's pauses fall at local t = 4-5 s and 10-11 s.
 const SCHEDULE_G_BLOCK3 = [
-    { d: 3, b: 340 }, { d: 1, b: null }, { d: 2, b: 250 },
-    { d: 3, b: 340 }, { d: 1, b: null }, { d: 2, b: 250 }
+    { d: 4, b: 15 }, { d: 1, b: null }, { d: 1, b: 285 },
+    { d: 4, b: 195 }, { d: 1, b: null }, { d: 1, b: 105 }
 ];
-// M's pauses fall at local t = 5-6 s and 8-9 s.
+// M: rectangle rotated -25 deg from Block 1's orientation, with its own
+// different leg order/pause placement.
+// M's pauses fall at local t = 1-2 s and 7-8 s.
 const SCHEDULE_M_BLOCK3 = [
-    { d: 5, b: 60 }, { d: 1, b: null }, { d: 2, b: 60 },
-    { d: 1, b: null }, { d: 3, b: 130 }
+    { d: 1, b: 50 }, { d: 1, b: null }, { d: 4, b: 140 },
+    { d: 1, b: 230 }, { d: 1, b: null }, { d: 4, b: 320 }
 ];
 
 const SCHEDULE_G = SCHEDULE_G_BLOCK1.concat(SCHEDULE_BLOCK2_PAUSE, SCHEDULE_G_BLOCK3);
@@ -118,12 +144,18 @@ function offsetMeters(origin, bearingDeg, meters) {
 
 // Start positions are derived from a single hub point and a single offset, so
 // the starting geometry is identical across all three conditions by
-// construction. G and M start 49.0 m apart; the participant sits on the
-// perpendicular bisector of the G-M axis, 55.7 m from each, so the geometry
+// construction. G and M start 40.0 m apart -- chosen so that SJ/SJC's
+// Block 1 (each agent contributes 15.0 m of the fixed 10 s-of-walking
+// budget, closing 30.0 m combined) ends with them 10.0 m apart: a clear,
+// unambiguous ~32% overlap of the 32 px markers at zoom 18, not just a
+// touch at the edges. IM does not require a meeting, but the geometry must
+// be identical across all three conditions per the flow spec, so IM uses
+// this same 40.0 m separation. The participant sits on the perpendicular
+// bisector of the G-M axis, roughly equidistant from each, so the geometry
 // never tilts toward one agent.
 const HUB = offsetMeters(MAP_CENTER, rot(0), 12);
-const START_G = offsetMeters(HUB, rot(255), 24.5);
-const START_M = offsetMeters(HUB, rot(75), 24.5);
+const START_G = offsetMeters(HUB, rot(255), 20.0);
+const START_M = offsetMeters(HUB, rot(75), 20.0);
 const START_U = offsetMeters(HUB, rot(165), 50);
 
 const positions = { leftNode: START_G, rightNode: START_M, mainNode: START_U };
@@ -252,9 +284,9 @@ function truePosition(who, elapsedMs) {
  * lie exactly on the scheduled path, so distance, duration, mean speed and the
  * matching across conditions are all untouched.
  * ------------------------------------------------------------------------ */
-const GPS_UPDATE_MS = 3000;   // interval between fixes
-const GPS_TWEEN_MS  = 2800;   // catch-up animation, then the marker rests
-const GPS_OFFSET_MS = { G: 0, M: 0 };
+const GPS_UPDATE_MS = 1000;   // interval between fixes (1 s so Block 2's 2 s pause renders as a visible stop)
+const GPS_TWEEN_MS  = 900;   // catch-up animation (90% of update interval), then the marker rests
+const GPS_OFFSET_MS = { G: 0, M: 500 };  // staggered so G and M never pulse on the same tick
 
 function agentPosition(who, elapsedMs) {
     const offset = GPS_OFFSET_MS[who];
@@ -427,7 +459,7 @@ function showManualContinueFallback() {
  * sequence begins.
  * ========================================================================== */
 const GLOBAL_TIMEOUT_MS = 240 * 1000;
-const ANIMATION_TIMEOUT_MS = TOTAL_ANIMATION_DURATION + FINAL_HOLD_DURATION + 15000; // 82 s
+const ANIMATION_TIMEOUT_MS = TOTAL_ANIMATION_DURATION + FINAL_HOLD_DURATION + 15000; // 48 s
 
 /* ==========================================================================
  * ONBOARDING FLOW
@@ -730,6 +762,7 @@ function bootstrap() {
                 "condition   " + CONDITION + "\n" +
                 "zoom        " + map.getZoom().toFixed(2) + "\n" +
                 "m per px    " + mPerPx.toFixed(3) + "\n" +
+                "G-M px      " + pxGM.toFixed(1) + "\n" +
                 "map canvas  " + canvas.clientWidth + " x " + canvas.clientHeight + " css px\n" +
                 "devicePixelRatio " + (window.devicePixelRatio || 1);
             document.body.appendChild(box);
