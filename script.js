@@ -123,7 +123,7 @@ const WALK_SPEED_MPS = 1.5;                // 5.4 km/h -- normal walking pace
 // SCHEDULE_G / SCHEDULE_M movement (built above); Block 2 is the shared
 // stop-between-blocks pause; Block 4 is the final stationary hold before
 // hand-back to the survey. Every boundary is a whole number of GPS fixes.
-const T_STABLE = 4000;   //  0 -  4 s   idle GPS jitter, agents at start position
+const T_STABLE = 6000;   //  0 -  6 s   idle GPS jitter, agents at start position
 const T_BLOCK1 = 12000;  //  4 - 16 s   Block 1 movement (in SCHEDULE_*)
 const T_BLOCK2 =  2000;  // 16 - 18 s   both agents stationary (in SCHEDULE_*)
 const T_BLOCK3 = 12000;  // 18 - 30 s   Block 3 movement (in SCHEDULE_*)
