@@ -1,71 +1,112 @@
 /* ============================================================================
  * LOCATION-SHARING SOCIAL DISCONNECTION PARADIGM
- * Condition: Independent Movement (IM)
- * Calibration: Package A3 — pedestrian pace, zoom 18, street scale
+ * Condition: Independent Movement (IM) -- control condition
+ * Timing source of truth: "CRIP - Experimental Flow - Exclusion Map Study"
  *
  * Everything below the CONDITION BLOCK is IDENTICAL across the three repos.
  * To change a condition, edit ONLY the CONDITION BLOCK.
  *
- * Design constraints enforced by this file (verified by verify.js):
- *   - Walking speed 1.5 m/s (5.4 km/h) in every condition, at every moment.
- *   - Total scheduled path length 40.5 m per agent in every condition.
- *   - Total walking time 27 s per agent in every condition.
- *   - Conditions differ ONLY in trajectory geometry and in the relative
- *     timing of the two agents' movements, never in speed or distance.
+ * Flow (t = 0 is the moment the participant submits their nickname):
+ *   Block 0  0-4 s    Starting position, stable (idle GPS jitter only)
+ *   Block 1  4-16 s   Asynchronous movement (12 s)
+ *   Block 2  16-18 s  Both agents stop between blocks (2 s)
+ *   Block 3  18-30 s  Asynchronous movement (12 s) -- same movement LOGIC as
+ *                      Block 1 (independent pauses, non-mirrored, natural
+ *                      pedestrian pace) but with different actual directions,
+ *                      per the spec's "same logic as IM Block 1 / SJ Block 3,
+ *                      totally different directions" instruction.
+ *   Block 4  30-33 s  Both agents remain stationary before hand-back to survey
+ *   Total sequence: 33 s.
+ *
+ * Design constraints (identical in every condition, verified numerically):
+ *   - Walking speed 1.5 m/s (5.4 km/h), pedestrian pace, identical in every
+ *     condition and every block.
+ *   - Each agent pauses for exactly 1 s, twice, during Block 1, and again
+ *     twice (independently) during Block 3 -- at times that never coincide
+ *     with the other agent's pauses, so no shared rhythm is visible.
+ *   - Each agent walks for exactly 10 s of the 12 s in Block 1 (15.0 m) and
+ *     10 s of the 12 s in Block 3 (15.0 m): 30.0 m total per agent, matched
+ *     across conditions.
+ *   - G-M start separation: 49.0 m, identical in every condition.
+ *   - Icons never overlap and never leave the zoom-18 viewport.
+ *   - Only the MANIPULATION differs between files: here, the agents never
+ *     move toward one another. Bearings for G and M are chosen so they are
+ *     never opposite/mirrored at the same instant (which would itself read
+ *     as a coordinated "moving apart" cue), and no two segment boundaries or
+ *     pauses land on the same second for both agents.
  * ========================================================================== */
 
 /* ==========================================================================
- * CONDITION BLOCK — the only part that differs between the three repos
+ * CONDITION BLOCK -- the only part that differs between the three repos
  * ========================================================================== */
 const CONDITION = "IM";
 const CONDITION_LABEL = "Independent Movement";
 
-// Movement schedule. Each segment is {d: seconds, b: bearing in degrees}.
-// b === null means the agent stands still (holds position).
-// Distance walked in a segment = WALK_SPEED_MPS * d. Speed is never varied.
-// Phase 3 (12-27 s): G walks a triangular loop, M walks a square loop. Different
-// path shapes, different bearings, holds at different moments. Neither agent ever
-// moves toward the other: G-M separation never falls below its 58.0 m start value.
-// Phase 4 (27-45 s): the same principle at a smaller scale, again asynchronous.
-const SCHEDULE_G = [
-    { d: 4, b: 170 }, { d: 1.5, b: null }, { d: 4, b: 290 }, { d: 1.5, b: null }, { d: 4, b: 50 },
-    { d: 5, b: 230 }, { d: 3, b: null }, { d: 5, b: 350 }, { d: 5, b: 110 }
+// -- Block 1 (local t = 0-12 s within the block) --------------------------
+// G: east, pause, north, east, pause, south -- a simple street-grid loop.
+// G's pauses fall at local t = 2-3 s and 8-9 s.
+const SCHEDULE_G_BLOCK1 = [
+    { d: 2, b: 92 }, { d: 1, b: null }, { d: 3, b: 4 },
+    { d: 2, b: 92 }, { d: 1, b: null }, { d: 3, b: 182 }
 ];
-const SCHEDULE_M = [
-    { d: 1.5, b: null }, { d: 3, b: 70 }, { d: 3, b: 160 }, { d: 3, b: 250 }, { d: 1.5, b: null }, { d: 3, b: 340 },
-    { d: 3.75, b: 115 }, { d: 3.75, b: 205 }, { d: 3, b: null }, { d: 3.75, b: 295 }, { d: 3.75, b: 25 }
+// M: southwest, pause, north, pause, east -- deliberately not the mirror
+// image of G's path, and never on an opposite bearing at the same second.
+// M's pauses fall at local t = 4-5 s and 7-8 s.
+const SCHEDULE_M_BLOCK1 = [
+    { d: 4, b: 205 }, { d: 1, b: null }, { d: 2, b: 4 },
+    { d: 1, b: null }, { d: 4, b: 92 }
 ];
+
+// -- Block 2 (both agents fully stationary for 2 s) ------------------------
+const SCHEDULE_BLOCK2_PAUSE = [{ d: 2, b: null }];
+
+// -- Block 3 (local t = 0-12 s within the block) ---------------------------
+// Same movement logic as Block 1 (independent walking + two 1 s pauses per
+// agent, non-mirrored) but every bearing is different from Block 1's.
+// G's pauses fall at local t = 3-4 s and 9-10 s.
+const SCHEDULE_G_BLOCK3 = [
+    { d: 3, b: 340 }, { d: 1, b: null }, { d: 2, b: 250 },
+    { d: 3, b: 340 }, { d: 1, b: null }, { d: 2, b: 250 }
+];
+// M's pauses fall at local t = 5-6 s and 8-9 s.
+const SCHEDULE_M_BLOCK3 = [
+    { d: 5, b: 60 }, { d: 1, b: null }, { d: 2, b: 60 },
+    { d: 1, b: null }, { d: 3, b: 130 }
+];
+
+const SCHEDULE_G = SCHEDULE_G_BLOCK1.concat(SCHEDULE_BLOCK2_PAUSE, SCHEDULE_G_BLOCK3);
+const SCHEDULE_M = SCHEDULE_M_BLOCK1.concat(SCHEDULE_BLOCK2_PAUSE, SCHEDULE_M_BLOCK3);
 /* ======================= END OF CONDITION BLOCK ========================== */
-
-
 /* ==========================================================================
  * SHARED GEOMETRY AND TIMING (identical in all three conditions)
  * ========================================================================== */
-const MAP_CENTER = [32.870301, 39.921891]; // Ankara — set with placement-tool.html
+const MAP_CENTER = [32.870379, 39.921936]; // Ankara -- set with placement-tool.html
 
-// Rotates the whole scene about MAP_CENTER. Use this to align the G-M axis with
-// a street, a footpath or an open space. Rotation is an isometry: distances,
-// speeds, separations and synchrony indices are all unchanged by it, so the
-// audit results hold for any value. 0 = G-M axis runs roughly east-west.
+// Rotates the whole scene about MAP_CENTER to align the G-M axis with a street.
+// Rotation is an isometry: distances, speeds, separations and synchrony indices
+// are all unchanged by it, so every audit result below holds for any value.
 const SCENE_ROTATION_DEG = 55;
 
 function rot(bearingDeg) { return (bearingDeg + SCENE_ROTATION_DEG + 360) % 360; }
-const MAP_ZOOM   = 18.0;                   // locked (min = max = 18.0), 0.458 m/pixel
+const MAP_ZOOM = 18.0;                     // locked (min = max = 18.0), 0.458 m/pixel
 
-const WALK_SPEED_MPS = 1.5;                // 5.4 km/h — normal walking pace
+const WALK_SPEED_MPS = 1.5;                // 5.4 km/h -- normal walking pace
 
-// Phase durations (ms). Total map sequence = 45 s + 1 s final hold = 46 s.
-const T_BASELINE =  8000;   //  0 -  8 s   idle GPS jitter
-const T_PAUSE    =  4000;   //  8 - 12 s   both agents stationary
-const T_PHASE3   = 15000;   // 12 - 27 s   condition-defining movement (12 s walking + 3 s holds)
-const T_PHASE4   = 18000;   // 27 - 45 s   condition-defining movement (15 s walking + 3 s holds)
-const TOTAL_ANIMATION_DURATION = T_BASELINE + T_PAUSE + T_PHASE3 + T_PHASE4; // 45000
-const FINAL_HOLD_DURATION = 1000;
+// Block durations (ms), matching the experimental-flow spec exactly.
+// Block 0 is the stable/idle window; Blocks 1 and 3 are the condition's
+// SCHEDULE_G / SCHEDULE_M movement (built above); Block 2 is the shared
+// stop-between-blocks pause; Block 4 is the final stationary hold before
+// hand-back to the survey. Every boundary is a whole number of GPS fixes.
+const T_STABLE = 4000;   //  0 -  4 s   idle GPS jitter, agents at start position
+const T_BLOCK1 = 12000;  //  4 - 16 s   Block 1 movement (in SCHEDULE_*)
+const T_BLOCK2 =  2000;  // 16 - 18 s   both agents stationary (in SCHEDULE_*)
+const T_BLOCK3 = 12000;  // 18 - 30 s   Block 3 movement (in SCHEDULE_*)
+const T_BLOCK4 =  3000;  // 30 - 33 s   final stationary hold, then hand-back
+const TOTAL_ANIMATION_DURATION = T_STABLE + T_BLOCK1 + T_BLOCK2 + T_BLOCK3 + T_BLOCK4; // 33000
+const FINAL_HOLD_DURATION = 0; // Block 4 above already is the final hold
 
 const EARTH_RADIUS_M = 6378137;
 
-// Actor start positions, all derived from a single hub point so that the
-// geometry is identical across conditions by construction.
 function offsetMeters(origin, bearingDeg, meters) {
     const b = bearingDeg * Math.PI / 180;
     const dNorth = meters * Math.cos(b);
@@ -75,13 +116,15 @@ function offsetMeters(origin, bearingDeg, meters) {
     return [origin[0] + dLng, origin[1] + dLat];
 }
 
-const HUB = offsetMeters(MAP_CENTER, rot(0), 22);          // midpoint of the G-M axis
-const START_G = offsetMeters(HUB, rot(255), 29);           // 29 m WSW of hub
-const START_M = offsetMeters(HUB, rot(75), 29);           // 29 m ENE of hub -> G-M = 58.0 m
-// Participant sits on the perpendicular bisector of the G-M axis (75 deg + 90),
-// so it is exactly equidistant from both agents. Any other bearing tilts the
-// participant toward one agent and introduces an uncontrolled asymmetry.
-const START_U = offsetMeters(HUB, rot(165), 52);          // participant, static
+// Start positions are derived from a single hub point and a single offset, so
+// the starting geometry is identical across all three conditions by
+// construction. G and M start 49.0 m apart; the participant sits on the
+// perpendicular bisector of the G-M axis, 55.7 m from each, so the geometry
+// never tilts toward one agent.
+const HUB = offsetMeters(MAP_CENTER, rot(0), 12);
+const START_G = offsetMeters(HUB, rot(255), 24.5);
+const START_M = offsetMeters(HUB, rot(75), 24.5);
+const START_U = offsetMeters(HUB, rot(165), 50);
 
 const positions = { leftNode: START_G, rightNode: START_M, mainNode: START_U };
 
@@ -94,17 +137,49 @@ const people = [
 /* ==========================================================================
  * TRAJECTORY ENGINE
  * Converts a segment schedule into timed waypoints, then interpolates.
- * Speed and distance are SPECIFIED here, not emergent from trig functions.
+ * Speed and distance are SPECIFIED here, never emergent from trig functions.
  * ========================================================================== */
+// An orbit segment { d, o: { rev, a0, dir } } walks a small circle around a
+// point, starting from wherever the agent currently is. The radius is DERIVED
+// from the duration so the agent still covers exactly WALK_SPEED_MPS * d
+// metres -- a tight orbit walked for a long time covers the same distance as
+// a long straight walk. This is how conditions stay matched on distance and
+// speed while looking completely different.
+const ORBIT_SAMPLES_PER_REV = 24;
+const ORBIT_UNIT_PERIM = 2 * ORBIT_SAMPLES_PER_REV * Math.sin(Math.PI / ORBIT_SAMPLES_PER_REV);
+
 function buildWaypoints(startPos, segments) {
     let pos = startPos, t = 0;
     const keys = [{ t: 0, pos: pos }];
     for (const seg of segments) {
-        t += seg.d * 1000;
-        if (seg.b !== null) pos = offsetMeters(pos, rot(seg.b), WALK_SPEED_MPS * seg.d);
-        keys.push({ t: t, pos: pos });
+        if (seg.o) {
+            const rev = seg.o.rev, dir = seg.o.dir || 1;
+            const radius = WALK_SPEED_MPS * seg.d / (rev * ORBIT_UNIT_PERIM);
+            const centre = offsetMeters(pos, rot(seg.o.a0 + 180), radius);
+            const n = Math.max(8, Math.round(rev * ORBIT_SAMPLES_PER_REV));
+            for (let i = 1; i <= n; i++) {
+                t += (seg.d * 1000) / n;
+                pos = offsetMeters(centre, rot(seg.o.a0 + dir * 360 * rev * (i / n)), radius);
+                keys.push({ t: t, pos: pos });
+            }
+        } else {
+            t += seg.d * 1000;
+            if (seg.b !== null) pos = offsetMeters(pos, rot(seg.b), WALK_SPEED_MPS * seg.d);
+            keys.push({ t: t, pos: pos });
+        }
     }
     return keys;
+}
+
+// Pure linear interpolation would make an agent jump from standing still to
+// full walking speed in one frame, and stop just as abruptly. Easing the
+// fraction within each segment produces natural acceleration/deceleration.
+// Because the easing is applied to the fraction, not the endpoints, distance
+// and duration per segment are unchanged, so cross-condition matching holds.
+const EASE_MIX = 0.30;   // 0 = constant speed, 1 = full smoothstep
+function easeFraction(f) {
+    const smooth = f * f * (3 - 2 * f);
+    return (1 - EASE_MIX) * f + EASE_MIX * smooth;
 }
 
 function positionAt(keys, tMs) {
@@ -112,7 +187,7 @@ function positionAt(keys, tMs) {
     for (let i = 1; i < keys.length; i++) {
         if (tMs <= keys[i].t) {
             const a = keys[i - 1], b = keys[i];
-            const f = (tMs - a.t) / (b.t - a.t);
+            const f = easeFraction((tMs - a.t) / (b.t - a.t));
             return [a.pos[0] + (b.pos[0] - a.pos[0]) * f,
                     a.pos[1] + (b.pos[1] - a.pos[1]) * f];
         }
@@ -120,9 +195,10 @@ function positionAt(keys, tMs) {
     return keys[keys.length - 1].pos;
 }
 
-// Deterministic GPS jitter. Two sine components per axis with agent-specific
-// frequencies and phases, so G and M are never correlated. Deterministic (not
-// Math.random) so the sequence is identical for every participant.
+// Deterministic GPS jitter: two sine components per axis with agent-specific
+// frequencies and phases, so G and M are never correlated by chance. It is
+// deterministic (not Math.random) so the sequence is identical for every
+// participant.
 const JITTER = {
     G: { fx1: 0.31, px1: 0.00, fx2: 0.53, px2: 1.70, fy1: 0.24, py1: 2.20, fy2: 0.47, py2: 0.40 },
     M: { fx1: 0.27, px1: 2.40, fx2: 0.61, px2: 0.90, fy1: 0.35, py1: 1.10, fy2: 0.19, py2: 2.90 }
@@ -133,13 +209,13 @@ function jitterMeters(who, tSec, amplitude) {
     const dy = (Math.sin(tSec * j.fy1 + j.py1) * 0.6 + Math.sin(tSec * j.fy2 + j.py2) * 0.4) * amplitude;
     return [dx, dy];
 }
-const JITTER_IDLE_M = 2.0;   // during baseline and pause
-const JITTER_MOVE_M = 0.7;   // while walking, so paths are not perfectly straight
-const JITTER_RAMP_MS = 2000; // amplitude is eased between the two, never stepped:
-                             // a step would teleport the marker and register as a
-                             // large instantaneous speed spike.
+const JITTER_IDLE_M = 2.0;   // during the stable window (Block 0)
+const JITTER_MOVE_M = 0.5;   // while walking, so paths are not perfectly straight
+const JITTER_RAMP_MS = 2000; // amplitude eases between the two, never steps --
+                              // a step would teleport the marker and register
+                              // as a large instantaneous speed spike.
 function jitterAmplitude(elapsedMs) {
-    const moveStart = T_BASELINE + T_PAUSE;
+    const moveStart = T_STABLE;
     const a = moveStart - JITTER_RAMP_MS / 2, b = moveStart + JITTER_RAMP_MS / 2;
     if (elapsedMs <= a) return JITTER_IDLE_M;
     if (elapsedMs >= b) return JITTER_MOVE_M;
@@ -150,9 +226,10 @@ function jitterAmplitude(elapsedMs) {
 const WAYPOINTS_G = buildWaypoints(START_G, SCHEDULE_G);
 const WAYPOINTS_M = buildWaypoints(START_M, SCHEDULE_M);
 
-function agentPosition(who, elapsedMs) {
+// The agent's real position at a given instant, before the app displays it.
+function truePosition(who, elapsedMs) {
     const keys = (who === "G") ? WAYPOINTS_G : WAYPOINTS_M;
-    const moveStart = T_BASELINE + T_PAUSE;
+    const moveStart = T_STABLE;
     const base = (elapsedMs < moveStart)
         ? keys[0].pos
         : positionAt(keys, elapsedMs - moveStart);
@@ -162,10 +239,40 @@ function agentPosition(who, elapsedMs) {
     return p;
 }
 
+/* --------------------------------------------------------------------------
+ * GPS UPDATE CADENCE
+ * A real location-sharing app does not receive a continuous stream. It gets a
+ * fix every few seconds and animates the marker to catch up, then the marker
+ * sits still until the next fix. Rendering the true position at 60 fps looks
+ * smoother than any real app and is one of the strongest cues that a display
+ * is generated rather than live. Sampling it here reproduces the real rhythm.
+ * The two agents use different offsets because two phones never report on the
+ * same clock -- identical update instants would themselves be a tell.
+ * This changes only WHEN a position is shown, never WHERE: the sampled points
+ * lie exactly on the scheduled path, so distance, duration, mean speed and the
+ * matching across conditions are all untouched.
+ * ------------------------------------------------------------------------ */
+const GPS_UPDATE_MS = 3000;   // interval between fixes
+const GPS_TWEEN_MS  = 2800;   // catch-up animation, then the marker rests
+const GPS_OFFSET_MS = { G: 0, M: 0 };
+
+function agentPosition(who, elapsedMs) {
+    const offset = GPS_OFFSET_MS[who];
+    const k = Math.floor((elapsedMs - offset) / GPS_UPDATE_MS);
+    const tFix  = offset + k * GPS_UPDATE_MS;
+    const tPrev = tFix - GPS_UPDATE_MS;
+    const from = truePosition(who, Math.max(0, tPrev));
+    const to   = truePosition(who, Math.max(0, tFix));
+    const since = elapsedMs - tFix;
+    const f = (since >= GPS_TWEEN_MS) ? 1 : easeFraction(since / GPS_TWEEN_MS);
+    return [from[0] + (to[0] - from[0]) * f,
+            from[1] + (to[1] - from[1]) * f];
+}
+
 /* ==========================================================================
  * BROWSER RUNTIME
  * Everything below only executes in a browser; the module export at the end
- * lets verify.js load this file in Node to audit the trajectories.
+ * lets an audit script load this file in Node to verify the trajectories.
  * ========================================================================== */
 let animationStarted = false;
 let userNickname = "";
@@ -239,8 +346,8 @@ function animateNodes(timestamp) {
 /* ==========================================================================
  * QUALTRICS HANDSHAKE
  * The payload carries technical information only. The participant's nickname
- * is NEVER transmitted: it exists only in the browser for the duration of the
- * session, consistent with the instruction that only the participant sees it.
+ * is NEVER transmitted -- it exists only in the browser for the session,
+ * consistent with the instruction that only the participant sees the full name.
  * ========================================================================== */
 const SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
 let qualtricsAckReceived = false;
@@ -314,7 +421,7 @@ function showManualContinueFallback() {
  * sequence begins.
  * ========================================================================== */
 const GLOBAL_TIMEOUT_MS = 240 * 1000;
-const ANIMATION_TIMEOUT_MS = TOTAL_ANIMATION_DURATION + FINAL_HOLD_DURATION + 15000; // 61 s
+const ANIMATION_TIMEOUT_MS = TOTAL_ANIMATION_DURATION + FINAL_HOLD_DURATION + 15000; // 82 s
 
 /* ==========================================================================
  * ONBOARDING FLOW
@@ -393,14 +500,14 @@ function bootstrap() {
         nicknameInput.addEventListener("keypress", (e) => { if (e.key === "Enter") handleLoginSubmit(); });
     }
 
-    /* ----------------------------------------------------------------------
+    /* ------------------------------------------------------------------
      * MAP LOAD FALLBACK
-     * -------------------------------------------------------------------- */
+     * ------------------------------------------------------------------ */
     let mapHasLoaded = false;
     let mapLoadFallbackTriggered = false;
 
-    // Adding ?debug=1 to the URL shows the underlying technical error instead of
-    // the generic participant-facing message. Participants never see this.
+    // ?debug=1 on the URL shows the underlying technical error instead of the
+    // generic participant-facing message. Participants never see this.
     const DEBUG = (typeof location !== "undefined") && /[?&]debug=1/.test(location.search);
 
     function showMapLoadFallback(detail) {
@@ -441,10 +548,8 @@ function bootstrap() {
         "poi", "housenumber", "mountain_peak", "aerodrome_label", "aeroway"
     ];
 
-    // ...but never hide green-space naming. The participant has to be able to
-    // tell that the agents are in a park rather than on blank ground, and the
-    // park name is what carries that. Park labels live in the poi source-layer,
-    // so without this exemption the decluttering removes them.
+    // ...but never hide green-space naming. The participant needs to be able
+    // to tell the agents are in a named place rather than on blank ground.
     const KEEP_VISIBLE = /park|garden|playground|pitch|forest|wood|water_name|nature|recreation/;
 
     function declutterBasemap() {
@@ -470,13 +575,13 @@ function bootstrap() {
         if (DEBUG) console.log("Declutter: " + hidden + " layers hidden, " + kept + " green-space layers kept.");
     }
 
-    /* ----------------------------------------------------------------------
-     * PARK NAMING
-     * If the style has no park label layer of its own, add one from the park
-     * source-layer so the green area is identifiable by name. The font is
-     * copied from an existing symbol layer rather than hard-coded, because a
-     * font name that is not in the style's glyph set renders nothing at all.
-     * -------------------------------------------------------------------- */
+    /* ------------------------------------------------------------------
+     * PARK / PLACE NAMING
+     * If the style has no label layer of its own for the relevant source, add
+     * one so the area is identifiable by name. Font is copied from an
+     * existing symbol layer rather than hard-coded, because a font name
+     * outside the style's glyph set renders nothing at all.
+     * ------------------------------------------------------------------ */
     function ensureParkLabels() {
         try {
             const style = map.getStyle();
@@ -524,14 +629,14 @@ function bootstrap() {
         }
     }
 
-    /* ----------------------------------------------------------------------
+    /* ------------------------------------------------------------------
      * BASEMAP PALETTE
      * Recolours the vector style to the soft, warm scheme used by consumer
      * location apps: cream land, muted green parks, pale blue water, white
      * roads with a light casing. Layers are matched by their vector-tile
      * source-layer and id rather than hard-coded style ids, so this survives
      * upstream changes to the Liberty style.
-     * -------------------------------------------------------------------- */
+     * ------------------------------------------------------------------ */
     const PALETTE = {
         land:      "#f2efe6",
         green:     "#bfe3ab",   // parks and named green space
@@ -602,7 +707,7 @@ function bootstrap() {
         }
     }
 
-    // Debug-only overlay reporting the true on-screen scale, so the geometry can
+    // Debug-only overlay reporting the true on-screen scale, so geometry can
     // be checked against the design figures without guessing from screenshots.
     function showScaleReadout() {
         try {
@@ -619,7 +724,6 @@ function bootstrap() {
                 "condition   " + CONDITION + "\n" +
                 "zoom        " + map.getZoom().toFixed(2) + "\n" +
                 "m per px    " + mPerPx.toFixed(3) + "\n" +
-                "G-M         58.0 m  ->  " + pxGM.toFixed(0) + " px on screen\n" +
                 "map canvas  " + canvas.clientWidth + " x " + canvas.clientHeight + " css px\n" +
                 "devicePixelRatio " + (window.devicePixelRatio || 1);
             document.body.appendChild(box);
@@ -660,19 +764,16 @@ function bootstrap() {
                 mapHasLoaded = true;
                 if (mapLoadTimeoutId) clearTimeout(mapLoadTimeoutId);
 
-                // At zoom 18 the OSM basemap renders every shop, bank and transit
-                // entrance. Those icons are the same size and colour family as the
-                // agent markers, so the agents stop being the subject of the screen.
-                // Hide the point-of-interest furniture and keep streets, parks,
-                // water and street names, which is what a location-sharing app
-                // actually shows.
+                // At zoom 18 the OSM basemap renders every shop, bank and
+                // transit entrance. Those icons are the same size and colour
+                // family as the agent markers, so decluttering keeps streets,
+                // parks, water and place names -- what a real location app shows.
                 declutterBasemap();
                 applyFindMyPalette();
                 ensureParkLabels();
 
-                // No CSS filter. A filter desaturates everything uniformly, which is
-                // what turned the map white; the palette below recolours the actual
-                // style layers instead, so parks stay green and water stays blue.
+                // No CSS filter: a filter desaturates everything uniformly.
+                // The palette above recolours the actual style layers instead.
                 map.getCanvas().style.filter = "none";
 
                 if (DEBUG) showScaleReadout();
@@ -685,7 +786,7 @@ function bootstrap() {
             });
         } else {
             console.warn("MapLibre CDN library failed to load.");
-            showMapLoadFallback("maplibregl is undefined — the CDN script tag in " +
+            showMapLoadFallback("maplibregl is undefined -- the CDN script tag in " +
                 "index.html did not load. Check the network tab for " +
                 "cdn.jsdelivr.net/npm/maplibre-gl@3.6.2");
         }
@@ -700,13 +801,14 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
     bootstrap();
 }
 
-/* Exported for offline auditing by verify.js (ignored by the browser). */
+/* Exported for offline auditing (ignored by the browser). */
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
         CONDITION, CONDITION_LABEL, SCHEDULE_G, SCHEDULE_M,
         START_G, START_M, START_U, MAP_CENTER, MAP_ZOOM, WALK_SPEED_MPS,
         SCENE_ROTATION_DEG,
-        T_BASELINE, T_PAUSE, T_PHASE3, T_PHASE4, TOTAL_ANIMATION_DURATION,
-        agentPosition, offsetMeters
+        T_STABLE, T_BLOCK1, T_BLOCK2, T_BLOCK3, T_BLOCK4, TOTAL_ANIMATION_DURATION,
+        agentPosition, truePosition, offsetMeters,
+        GPS_UPDATE_MS, GPS_TWEEN_MS
     };
 }

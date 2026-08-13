@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Konum yerleştirme aracı (senkronize)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+  #panel {
+    position: fixed; top:0; left:0; width: 340px; height: 100vh; overflow-y:auto;
+    background: #fff; border-right: 1px solid #ddd; padding: 20px; z-index: 10; font-size: 14px;
+  }
+  #map { position: fixed; top:0; left:340px; right:0; bottom:0; }
+  h2 { font-size: 17px; margin: 0 0 6px; }
+  .sub { color:#666; font-size:12px; margin-bottom: 16px; line-height:1.5; }
+  .row { margin-bottom: 14px; }
+  label { display:block; font-weight:600; margin-bottom:6px; }
+  .cond-btns { display:flex; gap:6px; }
+  .cond-btns button {
+    flex:1; padding:8px 0; border:1px solid #ccc; background:#f2f2f2; border-radius:6px; cursor:pointer; font-size:13px;
+  }
+  .cond-btns button.active { background:#1a73e8; color:#fff; border-color:#1a73e8; }
+  .legend { display:flex; gap:14px; align-items:center; font-size:12px; margin-top:4px; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:4px; vertical-align:-1px; }
+  input[type=range] { width:100%; }
+  input[type=text] { width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; font-family: monospace; }
+  button.go { padding:8px 14px; border:none; background:#1a73e8; color:#fff; border-radius:6px; cursor:pointer; margin-top:8px; }
+  button.zoom { padding:8px 14px; border:1px solid #ccc; background:#f2f2f2; border-radius:6px; cursor:pointer; margin-top:8px; margin-left:6px; }
+  table { width:100%; border-collapse: collapse; margin-top:8px; }
+  td { padding:3px 0; font-size:13px; }
+  td.val { text-align:right; font-family: monospace; }
+  hr { border:none; border-top:1px solid #eee; margin: 16px 0; }
+  pre#codeOut {
+    background:#111827; color:#d1fae5; padding:10px; border-radius:6px; font-size:12px;
+    white-space:pre-wrap; word-break:break-all;
+  }
+  .warn { background:#fff7ed; border:1px solid #fdba74; color:#7c2d12; padding:8px; border-radius:6px; font-size:12px; margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h2>Konum yerleştirme aracı</h2>
+  <div class="sub">Bu araç, script.js dosyalarındaki GERÇEK program (hub/offset/schedule) ile birebir aynı formülleri kullanır -- burada gördüğün, tarayıcıda göreceğinin aynısıdır. Haritayı kaydır, sahne her zaman ekranın ortasında kalır.</div>
+
+  <div class="row">
+    <label>Koşul</label>
+    <div class="cond-btns">
+      <button data-cond="IM" class="active">IM</button>
+      <button data-cond="SJ">SJ</button>
+      <button data-cond="SJC">SJC</button>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:#1e3a5f"></span>G</span>
+      <span><span class="dot" style="background:#7f1d1d"></span>M</span>
+      <span><span class="dot" style="background:#1a73e8"></span>katılımcı</span>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="row">
+    <label>Eksen açısı: <span id="rotVal">55</span>°</label>
+    <input type="range" id="rotSlider" min="0" max="359" value="55">
+    <div class="sub" style="margin-top:6px;">G-M ekseni bu açıyla döner. Mesafeler ve süreler değişmez (rotasyon bir izometridir).</div>
+  </div>
+
+  <div class="row">
+    <label>Bir koordinata git (enlem, boylam)</label>
+    <input type="text" id="coordInput" value="39.921891, 32.870301">
+    <button class="go" id="goBtn">Git</button>
+    <button class="zoom" id="zoomToggle">Çalışma zoom'u (18)</button>
+  </div>
+
+  <hr>
+
+  <div class="row">
+    <label>Ölçüler (script.js ile birebir)</label>
+    <table id="measurements"></table>
+  </div>
+
+  <hr>
+
+  <div class="row">
+    <label>script.js için ayarla</label>
+    <div class="sub">Beğendiğin yeri bulunca bu iki satırı KOPYALA, üç script.js dosyasının hepsinde aynı iki satırı değiştir.</div>
+    <pre id="codeOut"></pre>
+  </div>
+
+  <div class="warn" id="staleWarning">
+    Bu araç şu anda güncel: HUB offset 12 m, START offset 24.5 m (G-M ≈ 49.0 m,
+    katılımcıya ≈ 55.7 m, buluşma sonrası ≈ 13.0 m) -- son script.js
+    dosyalarıyla senkron. script.js'te bu sayılar değişirse bu dosya da
+    güncellenmeli, yoksa yine tutmaz.
+  </div>
+</div>
+<div id="map"></div>
+
+<script>
+/* ============================================================================
+ * These constants and functions are copied verbatim from the shipped
+ * script.js files (SHARED GEOMETRY AND TIMING + TRAJECTORY ENGINE sections).
+ * If script.js changes, this file must be updated to match, or the preview
+ * will silently drift out of sync again -- which is exactly what happened
+ * with the previous placement-tool.html.
+ * ========================================================================== */
+const EARTH_RADIUS_M = 6378137;
+const WALK_SPEED_MPS = 1.5;
+const HUB_OFFSET_M = 12;
+const START_OFFSET_M = 24.5;
+const PARTICIPANT_OFFSET_M = 50;
+const MAP_ZOOM_DEFAULT = 18.0;
+
+function offsetMeters(origin, bearingDeg, meters) {
+    const b = bearingDeg * Math.PI / 180;
+    const dNorth = meters * Math.cos(b);
+    const dEast  = meters * Math.sin(b);
+    const dLat = (dNorth / EARTH_RADIUS_M) * 180 / Math.PI;
+    const dLng = (dEast / (EARTH_RADIUS_M * Math.cos(origin[1] * Math.PI / 180))) * 180 / Math.PI;
+    return [origin[0] + dLng, origin[1] + dLat];
+}
+function distMeters(a, b) {
+    const R = 6378137, lat = a[1] * Math.PI / 180;
+    const dLng = (a[0]-b[0]) * Math.PI/180 * Math.cos(lat) * R;
+    const dLat = (a[1]-b[1]) * Math.PI/180 * R;
+    return Math.hypot(dLng, dLat);
+}
+
+// Verbatim schedules from the final script_IM.js / script_SJ.js / script_SJC.js
+const SCHEDULES = {
+  IM: {
+    G: [
+      { d: 3, b: 135 }, { d: 3, b: 195 }, { d: 3, b: null }, { d: 3, b: 315 }, { d: 3, b: null }, { d: 3, b: 15 },
+      { d: 5, b: 40 }, { d: 2, b: null }, { d: 7, b: 160 }, { d: 3, b: null }, { d: 4, b: 250 }, { d: 1, b: null }, { d: 8, b: 10 }
+    ],
+    M: [
+      { d: 3, b: null }, { d: 3, b: 270 }, { d: 3, b: 0 }, { d: 3, b: 90 }, { d: 3, b: null }, { d: 3, b: 180 },
+      { d: 2, b: null }, { d: 9, b: 280 }, { d: 6, b: 70 }, { d: 1, b: null }, { d: 5, b: 190 }, { d: 3, b: null }, { d: 4, b: 340 }
+    ]
+  },
+  SJ: {
+    G: [
+      { d: 6, b: 75 }, { d: 3, b: null }, { d: 6, b: 75 }, { d: 3, b: null },
+      { d: 3, b: 55 }, { d: 3, b: 235 }, { d: 3, b: 75 }, { d: 2, b: null },
+      { d: 3, b: 255 }, { d: 3, b: 35 }, { d: 3, b: 215 }, { d: 2, b: null },
+      { d: 3, b: 95 }, { d: 3, b: 275 }, { d: 2, b: null }
+    ],
+    M: [
+      { d: 6, b: 255 }, { d: 3, b: null }, { d: 6, b: 255 }, { d: 3, b: null },
+      { d: 3, b: 180 }, { d: 3, b: 110 }, { d: 2, b: null },
+      { d: 3, b: 345 }, { d: 3, b: 295 }, { d: 3, b: 340 }, { d: 2, b: null },
+      { d: 3, b: 40 }, { d: 3, b: 275 }, { d: 2, b: null }, { d: 3, b: 275 }
+    ]
+  },
+  SJC: {
+    G: [
+      { d: 6, b: 75 }, { d: 3, b: null }, { d: 6, b: 75 }, { d: 3, b: null },
+      { d: 12, b: 15 }, { d: 6, b: null }, { d: 12, b: 195 }
+    ],
+    M: [
+      { d: 6, b: 255 }, { d: 3, b: null }, { d: 6, b: 255 }, { d: 3, b: null },
+      { d: 12, b: 15 }, { d: 6, b: null }, { d: 12, b: 195 }
+    ]
+  }
+};
+
+function buildWaypoints(startPos, segments, rotFn) {
+    let pos = startPos, t = 0;
+    const keys = [{ t: 0, pos: pos }];
+    for (const seg of segments) {
+        t += seg.d * 1000;
+        if (seg.b !== null) pos = offsetMeters(pos, rotFn(seg.b), WALK_SPEED_MPS * seg.d);
+        keys.push({ t: t, pos: pos });
+    }
+    return keys;
+}
+
+let state = {
+    center: [32.870301, 39.921891],
+    rotation: 55,
+    zoom: MAP_ZOOM_DEFAULT,
+    condition: 'IM'
+};
+
+function rot(bearingDeg) { return (bearingDeg + state.rotation + 360) % 360; }
+
+function computeGeometry() {
+    const hub = offsetMeters(state.center, rot(0), HUB_OFFSET_M);
+    const startG = offsetMeters(hub, rot(255), START_OFFSET_M);
+    const startM = offsetMeters(hub, rot(75), START_OFFSET_M);
+    const startU = offsetMeters(hub, rot(165), PARTICIPANT_OFFSET_M);
+    return { hub, startG, startM, startU };
+}
+
+function computeFullPath(cond) {
+    const { startG, startM, startU } = computeGeometry();
+    const sched = SCHEDULES[cond];
+    const wpG = buildWaypoints(startG, sched.G, rot);
+    const wpM = buildWaypoints(startM, sched.M, rot);
+    return { startG, startM, startU, wpG, wpM };
+}
+
+// ---- map setup ----
+let map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    center: state.center,
+    zoom: state.zoom
+});
+map.dragRotate.disable();
+map.touchZoomRotate.disableRotation();
+
+let markers = {};
+let routeSourceAdded = false;
+
+function ensureMarker(id, color, label) {
+    if (markers[id]) return markers[id];
+    const el = document.createElement('div');
+    el.style.cssText = `width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;
+        display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:12px;
+        box-shadow:0 1px 4px rgba(0,0,0,.4);`;
+    el.textContent = label;
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(state.center).addTo(map);
+    markers[id] = marker;
+    return marker;
+}
+
+function pathToGeoJSON(wp) {
+    return {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: wp.map(k => k.pos) }
+    };
+}
+
+function render() {
+    const cond = state.condition;
+    const { startG, startM, startU, wpG, wpM } = computeFullPath(cond);
+
+    ensureMarker('G', '#1e3a5f', 'G').setLngLat(startG);
+    ensureMarker('M', '#7f1d1d', 'M').setLngLat(startM);
+    ensureMarker('U', '#1a73e8', '').setLngLat(startU);
+
+    const src = map.getSource('routes');
+    const data = {
+        type: 'FeatureCollection',
+        features: [pathToGeoJSON(wpG), pathToGeoJSON(wpM)]
+    };
+    if (src) {
+        src.setData(data);
+    } else if (map.isStyleLoaded()) {
+        addRouteLayers(data);
+    }
+
+    // measurements
+    const gEnd = wpG[wpG.length - 1].pos, mEnd = wpM[wpM.length - 1].pos;
+    const startSep = distMeters(startG, startM);
+    const endSep = distMeters(gEnd, mEnd);
+    const walkDist = SCHEDULES[cond].G.filter(s => s.b !== null).reduce((a, s) => a + s.d, 0) * WALK_SPEED_MPS;
+    const totalDur = SCHEDULES[cond].G.reduce((a, s) => a + s.d, 0);
+    const distU_G = distMeters(startU, startG);
+    const distU_M = distMeters(startU, startM);
+
+    // bounding box of the whole scene (both paths + participant)
+    let allPts = wpG.map(k=>k.pos).concat(wpM.map(k=>k.pos)).concat([startU]);
+    let minLng=Infinity,maxLng=-Infinity,minLat=Infinity,maxLat=-Infinity;
+    allPts.forEach(p=>{ minLng=Math.min(minLng,p[0]); maxLng=Math.max(maxLng,p[0]); minLat=Math.min(minLat,p[1]); maxLat=Math.max(maxLat,p[1]); });
+    const sceneWidthM = distMeters([minLng,(minLat+maxLat)/2], [maxLng,(minLat+maxLat)/2]);
+
+    const rows = [
+        ['G-M başlangıç', startSep.toFixed(1) + ' m'],
+        ['G-M dizi sonu', endSep.toFixed(1) + ' m'],
+        ['Ajan başına yürüme', walkDist.toFixed(1) + ' m'],
+        ['Yürüme hızı', '1.5 m/s'],
+        ['Bu fazın süresi', totalDur + ' s'],
+        ['Katılımcı → G', distU_G.toFixed(1) + ' m'],
+        ['Katılımcı → M', distU_M.toFixed(1) + ' m'],
+        ['Sahne genişliği', sceneWidthM.toFixed(0) + ' m']
+    ];
+    document.getElementById('measurements').innerHTML = rows.map(r =>
+        `<tr><td>${r[0]}</td><td class="val">${r[1]}</td></tr>`).join('');
+
+    document.getElementById('codeOut').textContent =
+        `const MAP_CENTER = [${state.center[0].toFixed(6)}, ${state.center[1].toFixed(6)}];\n` +
+        `const SCENE_ROTATION_DEG = ${state.rotation};`;
+}
+
+function addRouteLayers(data) {
+    map.addSource('routes', { type: 'geojson', data });
+    map.addLayer({
+        id: 'routes-line', type: 'line', source: 'routes',
+        paint: { 'line-color': '#1a73e8', 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': 0.7 }
+    });
+    routeSourceAdded = true;
+}
+
+map.on('load', () => {
+    render();
+});
+map.on('move', () => {
+    state.center = map.getCenter().toArray();
+    render();
+});
+
+document.querySelectorAll('.cond-btns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.cond-btns button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.condition = btn.dataset.cond;
+        render();
+    });
+});
+
+document.getElementById('rotSlider').addEventListener('input', (e) => {
+    state.rotation = parseInt(e.target.value, 10);
+    document.getElementById('rotVal').textContent = state.rotation;
+    render();
+});
+
+document.getElementById('goBtn').addEventListener('click', () => {
+    const val = document.getElementById('coordInput').value.trim();
+    const parts = val.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        map.flyTo({ center: [parts[1], parts[0]], zoom: state.zoom });
+    } else {
+        alert('Format: enlem, boylam  (ör. 39.921891, 32.870301)');
+    }
+});
+
+let zoomToggled = false;
+document.getElementById('zoomToggle').addEventListener('click', () => {
+    zoomToggled = !zoomToggled;
+    state.zoom = zoomToggled ? 17 : MAP_ZOOM_DEFAULT;
+    document.getElementById('zoomToggle').textContent = "Çalışma zoom'u (" + state.zoom.toFixed(0) + ")";
+    map.setZoom(state.zoom);
+});
+</script>
+</body>
+</html>
