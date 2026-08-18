@@ -1,11 +1,6 @@
 /* ============================================================================
  * LOCATION-SHARING SOCIAL DISCONNECTION PARADIGM
  * Condition: Independent Movement (IM) -- control condition
- * Timing source of truth: "CRIP - Experimental Flow - Exclusion Map Study"
- *
- * Everything below the CONDITION BLOCK is IDENTICAL across the three repos.
- * To change a condition, edit ONLY the CONDITION BLOCK.
- *
  * Flow (t = 0 is the moment the participant submits their nickname):
  *   Block 0  0-6 s    Starting position, stable (idle GPS jitter only)
  *   Block 1  6-18 s   Asynchronous movement (12 s)
@@ -15,22 +10,19 @@
  *                      pedestrian pace) but with different actual directions,
  *                      per the spec's "same logic as IM Block 1 / SJ Block 3,
  *                      totally different directions" instruction.
- *   Block 4  30-33 s  Both agents remain stationary before hand-back to survey
- *   Total sequence: 33 s.
+ *   Block 4  32-35 s  Both agents remain stationary before hand-back to survey
+ *   Total sequence: 35 s.
  *
- * Design constraints (identical in every condition, verified numerically):
- *   - Walking speed 1.5 m/s (5.4 km/h), pedestrian pace, identical in every
- *     condition and every block.
+ * Design constraints (identical in every condition):
+ *   - Walking speed 1.5 m/s (5.4 km/h), pedestrian pace.
  *   - Each agent pauses for exactly 1 s, twice, during Block 1, and again
- *     twice (independently) during Block 3 -- at times that never coincide
- *     with the other agent's pauses, so no shared rhythm is visible.
+ *     twice (independently) during Block 3 at independent (non-coinciding) times.
  *   - Each agent walks for exactly 10 s of the 12 s in Block 1 (15.0 m) and
  *     10 s of the 12 s in Block 3 (15.0 m): 30.0 m total per agent, matched
  *     across conditions.
  *   - G-M start separation: 40.0 m, identical in every condition.
- *   - Icons never overlap and never leave the zoom-18 viewport.
- *   - Only the MANIPULATION differs between files: here, the agents never
- *     move toward one another. Bearings for G and M are chosen so they are
+ *   - Icons never totally overlap and never leave the zoom-18 viewport.
+ *   - MANIPULATION: The agents never move toward one another. Bearings for G and M are chosen so they are
  *     never opposite/mirrored at the same instant (which would itself read
  *     as a coordinated "moving apart" cue), and no two segment boundaries or
  *     pauses land on the same second for both agents.
@@ -247,12 +239,15 @@ const JITTER_RAMP_MS = 2000; // amplitude eases between the two, never steps --
                               // a step would teleport the marker and register
                               // as a large instantaneous speed spike.
 function jitterAmplitude(elapsedMs) {
-    const moveStart = T_STABLE;
-    const a = moveStart - JITTER_RAMP_MS / 2, b = moveStart + JITTER_RAMP_MS / 2;
-    if (elapsedMs <= a) return JITTER_IDLE_M;
-    if (elapsedMs >= b) return JITTER_MOVE_M;
-    const ease = 0.5 - 0.5 * Math.cos(Math.PI * (elapsedMs - a) / JITTER_RAMP_MS);
-    return JITTER_IDLE_M + (JITTER_MOVE_M - JITTER_IDLE_M) * ease;
+    const t1 = T_STABLE + T_BLOCK1;
+    const t2 = t1 + T_BLOCK2;
+    const t3 = t2 + T_BLOCK3;
+
+    if (elapsedMs <= T_STABLE) return JITTER_IDLE_M;
+    if (elapsedMs >= t1 && elapsedMs <= t2) return JITTER_IDLE_M;
+    if (elapsedMs >= t3) return JITTER_IDLE_M;
+
+    return JITTER_MOVE_M;
 }
 
 const WAYPOINTS_G = buildWaypoints(START_G, SCHEDULE_G);
