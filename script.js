@@ -3,29 +3,15 @@
  * Condition: Independent Movement (IM) -- control condition
  * Flow (t = 0 is the moment the participant submits their nickname):
  *   Block 0  0-6 s    Starting position, stable (idle GPS jitter only)
- *   Block 1  6-18 s   Asynchronous movement (12 s)
- *   Block 2  18-20 s  Both agents stop between blocks (2 s)
- *   Block 3  20-32 s  Asynchronous movement (12 s) -- same movement LOGIC as
+ *   Block 1  6-24 s   Asynchronous movement (18 s)
+ *   Block 2  24-26 s  Both agents stop between blocks (2 s)
+ *   Block 3  26-44 s  Asynchronous movement (18 s) -- same movement LOGIC as
  *                      Block 1 (independent pauses, non-mirrored, natural
  *                      pedestrian pace) but with different actual directions,
  *                      per the spec's "same logic as IM Block 1 / SJ Block 3,
  *                      totally different directions" instruction.
- *   Block 4  32-35 s  Both agents remain stationary before hand-back to survey
- *   Total sequence: 35 s.
- *
- * Design constraints (identical in every condition):
- *   - Walking speed 1.5 m/s (5.4 km/h), pedestrian pace.
- *   - Each agent pauses for exactly 1 s, twice, during Block 1, and again
- *     twice (independently) during Block 3 at independent (non-coinciding) times.
- *   - Each agent walks for exactly 10 s of the 12 s in Block 1 (15.0 m) and
- *     10 s of the 12 s in Block 3 (15.0 m): 30.0 m total per agent, matched
- *     across conditions.
- *   - G-M start separation: 40.0 m, identical in every condition.
- *   - Icons never totally overlap and never leave the zoom-18 viewport.
- *   - MANIPULATION: The agents never move toward one another. Bearings for G and M are chosen so they are
- *     never opposite/mirrored at the same instant (which would itself read
- *     as a coordinated "moving apart" cue), and no two segment boundaries or
- *     pauses land on the same second for both agents.
+ *   Block 4  44-47 s  Both agents remain stationary before hand-back to survey
+ *   Total sequence: 47 s.
  * ========================================================================== */
 
 /* ==========================================================================
@@ -54,10 +40,6 @@ const CONDITION_LABEL = "Independent Movement";
 // agent mirrors the other; durations, pause counts, and total walking
 // distance (15 m per block, 30 m total per agent) are unchanged.
 
-// -- Block 1 (local t = 0-12 s within the block) --------------------------
-// G: short leg (1s, radial) + long leg (4s, tangential), oriented on the
-// G-M axis itself (255/75 deg radial, 345/165 deg tangential).
-// G's pauses fall at local t = 1-2 s and 7-8 s.
 // -- Block 1 (local t = 0-18 s within the block) --------------------------
 // 18 seconds of continuous, asynchronous, and non-mirrored rectangular paths.
 const SCHEDULE_G_BLOCK1 = [
