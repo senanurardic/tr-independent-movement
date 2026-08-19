@@ -122,7 +122,7 @@ function offsetMeters(origin, bearingDeg, meters) {
 const HUB = offsetMeters(MAP_CENTER, rot(0), 12);
 const START_G = offsetMeters(HUB, rot(255), 32.0);
 const START_M = offsetMeters(HUB, rot(75), 32.0);
-const START_U = offsetMeters(HUB, rot(165), 50.0);
+const START_U = offsetMeters(HUB, rot(162), 48.0);
 
 const positions = { leftNode: START_G, rightNode: START_M, mainNode: START_U };
 
