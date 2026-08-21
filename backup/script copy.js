@@ -356,60 +356,25 @@ function buildPayload(reason) {
     };
 }
 
-// DIAGNOSTIC: logs exactly what this frame believes about its embedding
-// context. Run once, at the moment we first try to signal completion, so it
-// shows up right when it matters instead of cluttering the log at load time.
-function logFrameContext() {
-    try {
-        console.log("[harita] window === window.parent ?", window === window.parent);
-        console.log("[harita] window === window.top ?", window === window.top);
-        console.log("[harita] location.href:", location.href);
-        console.log("[harita] document.referrer:", document.referrer);
-    } catch (e) {
-        console.warn("[harita] logFrameContext failed:", e);
-    }
-}
-
-function postToHosts(payload) {
-    let sentAny = false;
-    try {
-        if (window.parent) {
-            window.parent.postMessage(payload, "*");
-            sentAny = true;
-        }
-    } catch (e) {
-        console.warn("[harita] postMessage to window.parent failed:", e);
-    }
-    try {
-        if (window.top && window.top !== window.parent) {
-            window.top.postMessage(payload, "*");
-            sentAny = true;
-        }
-    } catch (e) {
-        console.warn("[harita] postMessage to window.top failed:", e);
-    }
-    console.log("[harita] postToHosts sent:", sentAny, payload);
-}
-
 function sendCompletionSignal(reason) {
     if (hasSentCompletion) return;
     hasSentCompletion = true;
-    logFrameContext();
     const payload = buildPayload(reason);
-    console.log("[harita] sendCompletionSignal firing, reason:", reason, "payload:", payload);
 
     let attempts = 0;
     const MAX_ATTEMPTS = 15;   // ~6 s of retries at 400 ms
     handshakeIntervalId = setInterval(() => {
         attempts++;
-        postToHosts(payload);
+        try {
+            if (window.parent) window.parent.postMessage(payload, "*");
+        } catch (e) {
+            console.warn("postMessage failed:", e);
+        }
         if (qualtricsAckReceived || attempts >= MAX_ATTEMPTS) {
             clearInterval(handshakeIntervalId);
             if (!qualtricsAckReceived) {
-                console.warn("[harita] No acknowledgment from Qualtrics after " + attempts + " attempts; showing manual continue button.");
+                console.warn("No acknowledgment from Qualtrics; showing manual continue button.");
                 showManualContinueFallback();
-            } else {
-                console.log("[harita] ACK received from Qualtrics after " + attempts + " attempts.");
             }
         }
     }, 400);
@@ -429,7 +394,9 @@ function showManualContinueFallback() {
     btn.setAttribute("aria-label", "Ankete devam et");
     btn.style.cssText = "padding:8px 20px;border:none;border-radius:6px;background:#2b6cb0;color:#fff;font-size:15px;cursor:pointer;";
     btn.addEventListener("click", () => {
-        postToHosts(buildPayload("manual-fallback"));
+        try {
+            if (window.parent) window.parent.postMessage(buildPayload("manual-fallback"), "*");
+        } catch (e) { /* ignore */ }
         wrap.remove();
     });
     wrap.appendChild(btn);
@@ -450,10 +417,8 @@ const ANIMATION_TIMEOUT_MS = TOTAL_ANIMATION_DURATION + FINAL_HOLD_DURATION + 15
  * ========================================================================== */
 function bootstrap() {
     window.addEventListener("message", (event) => {
-        console.log("[harita] incoming message:", event.data, "from origin:", event.origin);
         if (event.data && event.data.type === "MAP_ANIMATION_ACK" && event.data.sessionId === SESSION_ID) {
             qualtricsAckReceived = true;
-            console.log("[harita] ACK matched this session, qualtricsAckReceived = true");
         }
     });
 
