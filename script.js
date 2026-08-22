@@ -17,8 +17,9 @@
 /* ==========================================================================
  * CONDITION BLOCK -- the only part that differs between the three repos
  * ========================================================================== */
-const CONDITION = "IM";
-const CONDITION_LABEL = "Independent Movement";
+const urlParams = new URLSearchParams(window.location.search);
+const CONDITION = urlParams.get('condition') || "IM";
+const CONDITION_LABEL = urlParams.get('conditionLabel') || "Independent Movement";
 
 // Each block is a closed rectangular loop for each agent: two pairs of
 // equal-duration, opposite-bearing legs that sum to exactly zero net
@@ -332,7 +333,7 @@ function animateNodes(timestamp) {
  * is NEVER transmitted -- it exists only in the browser for the session,
  * consistent with the instruction that only the participant sees the full name.
  * ========================================================================== */
-const SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
+const SESSION_ID = urlParams.get('sessionid') || ("sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9));
 let qualtricsAckReceived = false;
 let hasSentCompletion = false;
 let handshakeIntervalId = null;
@@ -340,19 +341,15 @@ let animationStartWallClock = null;
 
 function buildPayload(reason) {
     return {
-        type: "MAP_ANIMATION_COMPLETE",
-        // Clearly-labelled condition identifier for the Qualtrics-side
-        // listener to write into Embedded Data. `condition` is the short
-        // code ("IM" | "SJ" | "SJC") that should be stored as the variable
-        // value; `conditionLabel` is included alongside it purely so the
-        // saved data is human-readable/auditable without a codebook lookup.
-        condition: CONDITION,                     // "IM" | "SJ" | "SJC"
-        conditionLabel: CONDITION_LABEL,
-        sessionId: SESSION_ID,
-        status: (reason === "normal") ? "complete" : "incomplete",
-        reason: reason,                           // normal | timeout | map-load-failed | manual-fallback
-        elapsedMs: animationStartWallClock ? (Date.now() - animationStartWallClock) : null,
-        timestamp: Date.now()
+        type: "MAP_APP_DATA", // Qualtrics tarafındaki JS bu tipi dinliyor
+        payload: {
+            sessionid: SESSION_ID,
+            animationstatus: reason === "normal" ? "completed" : reason,
+            reason: reason,
+            elapsedMs: animationStartWallClock ? (Date.now() - animationStartWallClock) : 0,
+            status: reason === "normal" ? "success" : "incomplete",
+            conditionLabel: CONDITION_LABEL
+        }
     };
 }
 
@@ -398,21 +395,14 @@ function sendCompletionSignal(reason) {
     const payload = buildPayload(reason);
     console.log("[harita] sendCompletionSignal firing, reason:", reason, "payload:", payload);
 
-    let attempts = 0;
-    const MAX_ATTEMPTS = 15;   // ~6 s of retries at 400 ms
-    handshakeIntervalId = setInterval(() => {
-        attempts++;
-        postToHosts(payload);
-        if (qualtricsAckReceived || attempts >= MAX_ATTEMPTS) {
-            clearInterval(handshakeIntervalId);
-            if (!qualtricsAckReceived) {
-                console.warn("[harita] No acknowledgment from Qualtrics after " + attempts + " attempts; showing manual continue button.");
-                showManualContinueFallback();
-            } else {
-                console.log("[harita] ACK received from Qualtrics after " + attempts + " attempts.");
-            }
-        }
-    }, 400);
+    // Veriyi Qualtrics'e gönder
+    postToHosts(payload);
+
+    // İşlem normal bitmediyse (timeout vb.) kullanıcıyı sayfada mahsur bırakmamak için 
+    // 3 saniye sonra manuel devam butonunu göster.
+    if (reason !== "normal") {
+        setTimeout(() => { showManualContinueFallback(); }, 3000);
+    }
 }
 
 function showManualContinueFallback() {
@@ -912,4 +902,4 @@ if (typeof module !== "undefined" && module.exports) {
         agentPosition, truePosition, offsetMeters,
         GPS_UPDATE_MS, GPS_TWEEN_MS
     };
-}
+}ß
