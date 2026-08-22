@@ -17,9 +17,8 @@
 /* ==========================================================================
  * CONDITION BLOCK -- the only part that differs between the three repos
  * ========================================================================== */
-const urlParams = new URLSearchParams(window.location.search);
-const CONDITION = urlParams.get('condition') || "IM";
-const CONDITION_LABEL = urlParams.get('conditionLabel') || "Independent Movement";
+const CONDITION = "IM";
+const CONDITION_LABEL = "Independent Movement";
 
 // Each block is a closed rectangular loop for each agent: two pairs of
 // equal-duration, opposite-bearing legs that sum to exactly zero net
@@ -333,7 +332,7 @@ function animateNodes(timestamp) {
  * is NEVER transmitted -- it exists only in the browser for the session,
  * consistent with the instruction that only the participant sees the full name.
  * ========================================================================== */
-const SESSION_ID = urlParams.get('sessionid') || ("sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9));
+const SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
 let qualtricsAckReceived = false;
 let hasSentCompletion = false;
 let handshakeIntervalId = null;
@@ -341,68 +340,44 @@ let animationStartWallClock = null;
 
 function buildPayload(reason) {
     return {
-        type: "MAP_APP_DATA", // Qualtrics tarafındaki JS bu tipi dinliyor
-        payload: {
-            sessionid: SESSION_ID,
-            animationstatus: reason === "normal" ? "completed" : reason,
-            reason: reason,
-            elapsedMs: animationStartWallClock ? (Date.now() - animationStartWallClock) : 0,
-            status: reason === "normal" ? "success" : "incomplete",
-            conditionLabel: CONDITION_LABEL
-        }
+        type: "MAP_ANIMATION_COMPLETE",
+        // Clearly-labelled condition identifier for the Qualtrics-side
+        // listener to write into Embedded Data. `condition` is the short
+        // code ("IM" | "SJ" | "SJC") that should be stored as the variable
+        // value; `conditionLabel` is included alongside it purely so the
+        // saved data is human-readable/auditable without a codebook lookup.
+        condition: CONDITION,                     // "IM" | "SJ" | "SJC"
+        conditionLabel: CONDITION_LABEL,
+        sessionId: SESSION_ID,
+        status: (reason === "normal") ? "complete" : "incomplete",
+        reason: reason,                           // normal | timeout | map-load-failed | manual-fallback
+        elapsedMs: animationStartWallClock ? (Date.now() - animationStartWallClock) : null,
+        timestamp: Date.now()
     };
-}
-
-// DIAGNOSTIC: logs exactly what this frame believes about its embedding
-// context. Run once, at the moment we first try to signal completion, so it
-// shows up right when it matters instead of cluttering the log at load time.
-function logFrameContext() {
-    try {
-        console.log("[harita] window === window.parent ?", window === window.parent);
-        console.log("[harita] window === window.top ?", window === window.top);
-        console.log("[harita] location.href:", location.href);
-        console.log("[harita] document.referrer:", document.referrer);
-    } catch (e) {
-        console.warn("[harita] logFrameContext failed:", e);
-    }
-}
-
-function postToHosts(payload) {
-    let sentAny = false;
-    try {
-        if (window.parent) {
-            window.parent.postMessage(payload, "*");
-            sentAny = true;
-        }
-    } catch (e) {
-        console.warn("[harita] postMessage to window.parent failed:", e);
-    }
-    try {
-        if (window.top && window.top !== window.parent) {
-            window.top.postMessage(payload, "*");
-            sentAny = true;
-        }
-    } catch (e) {
-        console.warn("[harita] postMessage to window.top failed:", e);
-    }
-    console.log("[harita] postToHosts sent:", sentAny, payload);
 }
 
 function sendCompletionSignal(reason) {
     if (hasSentCompletion) return;
     hasSentCompletion = true;
-    logFrameContext();
     const payload = buildPayload(reason);
-    console.log("[harita] sendCompletionSignal firing, reason:", reason, "payload:", payload);
 
-    // Veriyi Qualtrics'e gönder
-    postToHosts(payload);
-
-    // İşlem normal bitmediyse (timeout vb.) kullanıcıyı sayfada mahsur bırakmamak için 
-    // 3 saniye sonra manuel devam butonunu göster.
-    if (reason !== "normal") {
-        setTimeout(() => { showManualContinueFallback(); }, 3000);
-    }
+    let attempts = 0;
+    const MAX_ATTEMPTS = 15;   // ~6 s of retries at 400 ms
+    handshakeIntervalId = setInterval(() => {
+        attempts++;
+        try {
+            if (window.parent) window.parent.postMessage(payload, "*");
+        } catch (e) {
+            console.warn("postMessage failed:", e);
+        }
+        if (qualtricsAckReceived || attempts >= MAX_ATTEMPTS) {
+            clearInterval(handshakeIntervalId);
+            if (!qualtricsAckReceived) {
+                console.warn("No acknowledgment from Qualtrics; showing manual continue button.");
+                showManualContinueFallback();
+            }
+        }
+    }, 400);
 }
 
 function showManualContinueFallback() {
@@ -419,7 +394,9 @@ function showManualContinueFallback() {
     btn.setAttribute("aria-label", "Ankete devam et");
     btn.style.cssText = "padding:8px 20px;border:none;border-radius:6px;background:#2b6cb0;color:#fff;font-size:15px;cursor:pointer;";
     btn.addEventListener("click", () => {
-        postToHosts(buildPayload("manual-fallback"));
+        try {
+            if (window.parent) window.parent.postMessage(buildPayload("manual-fallback"), "*");
+        } catch (e) { /* ignore */ }
         wrap.remove();
     });
     wrap.appendChild(btn);
@@ -440,10 +417,8 @@ const ANIMATION_TIMEOUT_MS = TOTAL_ANIMATION_DURATION + FINAL_HOLD_DURATION + 15
  * ========================================================================== */
 function bootstrap() {
     window.addEventListener("message", (event) => {
-        console.log("[harita] incoming message:", event.data, "from origin:", event.origin);
         if (event.data && event.data.type === "MAP_ANIMATION_ACK" && event.data.sessionId === SESSION_ID) {
             qualtricsAckReceived = true;
-            console.log("[harita] ACK matched this session, qualtricsAckReceived = true");
         }
     });
 
@@ -902,4 +877,4 @@ if (typeof module !== "undefined" && module.exports) {
         agentPosition, truePosition, offsetMeters,
         GPS_UPDATE_MS, GPS_TWEEN_MS
     };
-}ß
+}
